@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "1019798704291",
+    "project_id": "tireiqv-2",
+    "storage_bucket": "tireiqv-2.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1019798704291:android:3c348cd9fd14a4c3492f16",
+        "android_client_info": {
+          "package_name": "com.example.tireiq_versionii"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "1019798704291-bcb90nngsc2a0vghn7hqb5au004v63hb.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDeFdcgd36i6Mto7l1xX5zVSqQPQhrC3x0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "1019798704291-bcb90nngsc2a0vghn7hqb5au004v63hb.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

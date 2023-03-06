@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CLIENT_ID</key>
+	<string>1019798704291-5nbv785t90bn1ci02pr26jg7phrl7iok.apps.googleusercontent.com</string>
+	<key>REVERSED_CLIENT_ID</key>
+	<string>com.googleusercontent.apps.1019798704291-5nbv785t90bn1ci02pr26jg7phrl7iok</string>
+	<key>API_KEY</key>
+	<string>AIzaSyADCJxtKGunh8sc_FzqrGV64phFbLUKsgk</string>
+	<key>GCM_SENDER_ID</key>
+	<string>1019798704291</string>
+	<key>PLIST_VERSION</key>
+	<string>1</string>
+	<key>BUNDLE_ID</key>
+	<string>com.example.tireiqVersionii</string>
+	<key>PROJECT_ID</key>
+	<string>tireiqv-2</string>
+	<key>STORAGE_BUCKET</key>
+	<string>tireiqv-2.appspot.com</string>
+	<key>IS_ADS_ENABLED</key>
+	<false></false>
+	<key>IS_ANALYTICS_ENABLED</key>
+	<false></false>
+	<key>IS_APPINVITE_ENABLED</key>
+	<true></true>
+	<key>IS_GCM_ENABLED</key>
+	<true></true>
+	<key>IS_SIGNIN_ENABLED</key>
+	<true></true>
+	<key>GOOGLE_APP_ID</key>
+	<string>1:1019798704291:ios:f0e83583f84f259c492f16</string>
+</dict>
+</plist>
