@@ -1,4 +1,5 @@
 
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -6,14 +7,14 @@ import 'package:bluetooth_enable_fork/bluetooth_enable_fork.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_elves/flutter_blue_elves.dart';
+//import 'package:flutter_blue_elves/flutter_blue_elves.dart';
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 //import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:tireiq_versionii/qr_service.dart';
 
-//import 'package:flutter_blue/flutter_blue.dart';
+import 'package:flutter_blue/flutter_blue.dart';
 
 import 'package:flutter_blue/gen/flutterblue.pb.dart' as ProtoBluetoothDevice;
 
@@ -34,9 +35,45 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
   String rearLeftConnection="Not Connected";
   String rearRightConnection="Not Connected";
 
+  List<ScanResult> deviceList=<ScanResult>[];
+
   late String email;
   late String vehicleRegNo;
+
+  void scanDevices(){
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+          content: Text('Scanning devices please wait')),
+    );
+    FlutterBlue flutterBlue = FlutterBlue.instance;
+    flutterBlue.startScan(timeout: Duration(seconds: 20));
+    flutterBlue.scanResults.listen((results) {
+      // do something with scan results
+      for (ScanResult r in results.toSet().toList().where((element) => element.device.name=="TIRE")) {
+        print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
+        );
+        deviceList.add(r);
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Added ${r.device.id} to devices list now size is ${deviceList.length}'),
+            ));
+      }
+
+    });
+
+    flutterBlue.stopScan();
+
+  }
+
   void getData() async{
+
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ran after 20s'),
+        ));
 
     await Permission.bluetooth.request();
     await Permission.bluetoothConnect.request();
@@ -47,148 +84,106 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
     vehicleRegNo=await prefs.getString('UserVehicleRegNo').toString();
     await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo).doc("TirePairStatus")
         .get().then((value) async {
-            dynamic data=value.data();
-            String fls=data['frontLeft'];
-            String frs=data['frontRight'];
-            String rls=data['rearLeft'];
-            String rrs=data['rearRight'];
-            if(fls!="Not Paired"){
-              setState(() {
-                frontLeftStatus=fls;
-              });
-
-              try {
-                BluetoothConnection connection = await BluetoothConnection.toAddress(frontLeftStatus);
-                print('Connected to the device');
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Connected to the device')),
-                );
-
-                if(connection.isConnected){
-                  setState(() {
-                    frontLeftConnection="Connected";
-                  });
-                }else{
-                  setState(() {
-                    frontLeftConnection="Connection Lost";
-                  });
-                }
-
-              }
-              catch (exception) {
-                print('Cannot connect, exception occured');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Cannot connect ${frontLeftStatus} , exception occured')),
-                );
-              }
-
-            }
-            if(frs!="Not Paired"){
-              setState(() {
-                frontRightStatus=frs;
-              });
-
-              try {
-                BluetoothConnection connection = await BluetoothConnection.toAddress(frontRightStatus);
-                print('Connected to the device');
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Connected to the device')),
-                );
-
-                if(connection.isConnected){
-                  setState(() {
-                    frontRightConnection="Connected";
-                  });
-                }else{
-                  setState(() {
-                    frontRightConnection="Connection Lost";
-                  });
-                }
-
-              }
-              catch (exception) {
-                print('Cannot connect, exception occured');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Cannot connect ${frontRightStatus} , exception occured')),
-                );
-              }
-
-            }
-            if(rls!="Not Paired"){
-              setState(() {
-                rearLeftStatus=rls;
-              });
-
-              try {
-                BluetoothConnection connection = await BluetoothConnection.toAddress(rearLeftStatus);
-                print('Connected to the device');
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Connected to the device')),
-                );
-
-                if(connection.isConnected){
-                  setState(() {
-                    rearLeftConnection="Connected";
-                  });
-                }else{
-                  setState(() {
-                    rearLeftConnection="Connection Lost";
-                  });
-                }
-
-              }
-              catch (exception) {
-                print('Cannot connect, exception occured');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Cannot connect ${rearLeftStatus} , exception occured')),
-                );
-              }
-
-            }
-            if(rrs!="Not Paired"){
-              setState(() {
-                rearRightStatus=rrs;
-              });
-
-              try {
-                BluetoothConnection connection = await BluetoothConnection.toAddress(rearRightStatus);
-                print('Connected to the device');
-
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Connected to the device')),
-                );
-
-                if(connection.isConnected){
-                  setState(() {
-                    rearRightConnection="Connected";
-                  });
-                }else{
-                  setState(() {
-                    rearRightConnection="Connection Lost";
-                  });
-                }
-
-              }
-              catch (exception) {
-                print('Cannot connect, exception occured');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                      content: Text('Cannot connect ${rearRightStatus} , exception occured')),
-                );
-              }
-
-            }
+      dynamic data=value.data();
+      String fls=data['frontLeft'];
+      String frs=data['frontRight'];
+      String rls=data['rearLeft'];
+      String rrs=data['rearRight'];
+      if(fls!="Not Paired"){
+        setState(() {
+          frontLeftStatus=fls;
         });
+
+        // ScanResult frontleft=deviceList[deviceList.indexWhere((element) =>
+        //       element.device.id.toString()==frontLeftStatus
+        // )];
+
+        // try{
+        //   if(frontleft!=null){
+        //     await frontleft!.device.connect(autoConnect: false).then((value){
+        //       setState(() {
+        //         frontLeftConnection="Connected";
+        //       });
+        //     });
+        //   }
+        // }catch(e){
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //       SnackBar(
+        //         content: Text(e.toString()),
+        //       ));
+        // }
+
+
+      }
+      if(frs!="Not Paired"){
+        setState(() {
+          frontRightStatus=frs;
+        });
+
+
+      }
+      if(rls!="Not Paired"){
+        setState(() {
+          rearLeftStatus=rls;
+        });
+
+        ScanResult rearleft=deviceList[deviceList.indexWhere((element) =>
+        element.device.id.toString()==rearLeftStatus
+        )];
+
+        try{
+
+          await rearleft.device.connect(autoConnect: false).then((value) async{
+            setState(() {
+              rearLeftConnection="Connected";
+            });
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(rearleft.device.state.first.toString()),
+              ));
+
+        }catch(e){
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString()),
+              ));
+        }
+
+      }
+      if(rrs!="Not Paired"){
+        setState(() {
+          rearRightStatus=rrs;
+        });
+
+
+        ScanResult rearright=deviceList[deviceList.indexWhere((element) =>
+        element.device.id.toString()==rearRightStatus
+        )];
+
+
+        try{
+
+          await rearright.device.connect(autoConnect: false).then((value) async{
+            setState(() {
+              rearRightConnection="Connected";
+            });
+          });
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(rearright.device.state.first.toString()),
+              ));
+
+        }catch(e){
+          ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(e.toString()),
+              ));
+        }
+
+
+      }
+    });
     //Speaker - BC:A9:61:4F:47:BB
 
     // FlutterBlue flutterBlue = FlutterBlue.instance;
@@ -246,7 +241,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
     //
     // });
 
-    // Some simplest connection :F
+
     // try {
     //   BluetoothConnection connection = await BluetoothConnection.toAddress(frontLeftStatus);
     //   print('Connected to the device');
@@ -281,76 +276,82 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
   @override
   void initState() {
 
-    // BluetoothEnable.enableBluetooth.then((result) {
-    //   if (result == "true") {
-    //     // Bluetooth has been enabled
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //           content: Text('Bluetooth has been enabled')),
-    //     );
-    //     // FlutterBlue flutterBlue = FlutterBlue.instance;
-    //     // flutterBlue.startScan(timeout: Duration(seconds: 30));
-    //     // flutterBlue.scanResults.listen((results) async {
-    //     //   // do something with scan results
-    //     //   for (ScanResult r in results) {
-    //     //     print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
-    //     //       ScaffoldMessenger.of(context).showSnackBar(
-    //     //         SnackBar(
-    //     //             content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
-    //     //       );
-    //     //       if(r.device.id==frontLeftStatus){
-    //     //         await r.device.connect();
-    //     //         ScaffoldMessenger.of(context).showSnackBar(
-    //     //           SnackBar(
-    //     //               content: Text('front left connection successful'),
-    //     //         ));
-    //     //       }else{
-    //     //         ScaffoldMessenger.of(context).showSnackBar(
-    //     //         SnackBar(
-    //     //         content: Text(frontLeftStatus+' not found'),
-    //     //         ));
-    //     //       }
-    //     //   }
-    //     //   flutterBlue.stopScan();
-    //     //
-    //     // });
-    //
-    //     // final flutterReactiveBle = FlutterReactiveBle();
-    //     // flutterReactiveBle.scanForDevices(withServices: [],).listen((device) {
-    //     //   //code for handling results
-    //     //   ScaffoldMessenger.of(context).showSnackBar(
-    //     //     SnackBar(
-    //     //         content: Text(device.name+" "+device.id)),
-    //     //   );
-    //     //
-    //     // }, onError: () {
-    //     //   //code for handling error
-    //     //   ScaffoldMessenger.of(context).showSnackBar(
-    //     //     SnackBar(
-    //     //         content: Text('Bluetooth Scan Error')),
-    //     //   );
-    //     //
-    //     // });
-    //
-    //   }
-    //   else if (result == "false") {
-    //     // Bluetooth has not been enabled
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //           content: Text('Bluetooth cannot be enabled')),
-    //     );
-    //   }
-    // });
+    BluetoothEnable.enableBluetooth.then((result) {
+      if (result == "true") {
+        // Bluetooth has been enabled
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Bluetooth has been enabled')),
+        );
+        // FlutterBlue flutterBlue = FlutterBlue.instance;
+        // flutterBlue.startScan(timeout: Duration(seconds: 30));
+        // flutterBlue.scanResults.listen((results) async {
+        //   // do something with scan results
+        //   for (ScanResult r in results) {
+        //     print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
+        //       ScaffoldMessenger.of(context).showSnackBar(
+        //         SnackBar(
+        //             content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
+        //       );
+        //       if(r.device.id==frontLeftStatus){
+        //         await r.device.connect();
+        //         ScaffoldMessenger.of(context).showSnackBar(
+        //           SnackBar(
+        //               content: Text('front left connection successful'),
+        //         ));
+        //       }else{
+        //         ScaffoldMessenger.of(context).showSnackBar(
+        //         SnackBar(
+        //         content: Text(frontLeftStatus+' not found'),
+        //         ));
+        //       }
+        //   }
+        //   flutterBlue.stopScan();
+        //
+        // });
 
-    FlutterBlueElves.instance.androidOpenBluetoothService((isOk) {
-      print(isOk ? "The user agrees to turn on the Bluetooth function" : "The user does not agrees to turn on the Bluetooth function");
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-                content: Text('Bluetooth has been enabled')),
-          );
+        // final flutterReactiveBle = FlutterReactiveBle();
+        // flutterReactiveBle.scanForDevices(withServices: [],).listen((device) {
+        //   //code for handling results
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     SnackBar(
+        //         content: Text(device.name+" "+device.id)),
+        //   );
+        //
+        // }, onError: () {
+        //   //code for handling error
+        //   ScaffoldMessenger.of(context).showSnackBar(
+        //     SnackBar(
+        //         content: Text('Bluetooth Scan Error')),
+        //   );
+        //
+        // });
+
+      }
+      else if (result == "false") {
+        // Bluetooth has not been enabled
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+              content: Text('Bluetooth cannot be enabled')),
+        );
+      }
     });
 
-    getData();
+    // FlutterBlueElves.instance.androidOpenBluetoothService((isOk) {
+    //   print(isOk ? "The user agrees to turn on the Bluetooth function" : "The user does not agrees to turn on the Bluetooth function");
+    //       ScaffoldMessenger.of(context).showSnackBar(
+    //         SnackBar(
+    //             content: Text('Bluetooth has been enabled')),
+    //       );
+    // });
+
+    Timer(Duration(seconds: 2), () {
+      scanDevices();
+    });
+
+    Timer(Duration(seconds: 23), () {
+      getData();
+    });
 
     super.initState();
   }
