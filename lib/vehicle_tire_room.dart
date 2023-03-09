@@ -8,7 +8,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 //import 'package:flutter_blue_elves/flutter_blue_elves.dart';
-import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+//import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 import 'package:permission_handler/permission_handler.dart';
 //import 'package:flutter_reactive_ble/flutter_reactive_ble.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,27 +35,40 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
   String rearLeftConnection="Not Connected";
   String rearRightConnection="Not Connected";
 
-  List<ScanResult> deviceList=<ScanResult>[];
+  String frontLeftTemp="25";
+  String frontRightTemp="25";
+  String rearRightTemp="25";
+  String rearLeftTemp="25";
+
+  String frontLeftPressure="0";
+  String frontRightPressure="0";
+  String rearLeftPressure="0";
+  String rearRightPressure="0";
+
+  List<BluetoothDevice> deviceList=<BluetoothDevice>[];
 
   late String email;
   late String vehicleRegNo;
 
+  FlutterBlue flutterBlue = FlutterBlue.instance;
+
   void scanDevices(){
+    deviceList.clear();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text('Scanning devices please wait')),
     );
-    FlutterBlue flutterBlue = FlutterBlue.instance;
+
     flutterBlue.startScan(timeout: Duration(seconds: 20));
     flutterBlue.scanResults.listen((results) {
       // do something with scan results
-      for (ScanResult r in results.toSet().toList().where((element) => element.device.name=="TIRE")) {
+      for (ScanResult r in results.toSet().where((element) => element.device.name=="TIRE")) {
         print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
-        );
-        deviceList.add(r);
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //       content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
+        // );
+        deviceList.add(r.device);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Added ${r.device.id} to devices list now size is ${deviceList.length}'),
@@ -64,24 +77,33 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
 
     });
 
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Stop Scan'),
+        ));
+
+    print('Stop Scan Called');
+
     flutterBlue.stopScan();
 
   }
 
-  void getData() async{
+  void loadData() async{
 
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Ran after 20s'),
+          content: Text('loading --'),
         ));
-
-    await Permission.bluetooth.request();
-    await Permission.bluetoothConnect.request();
-    await Permission.bluetoothScan.request();
 
     final prefs=await SharedPreferences.getInstance();
     email=await prefs.getString('UserEmail').toString();
     vehicleRegNo=await prefs.getString('UserVehicleRegNo').toString();
+
+    await Permission.bluetooth.request();
+    await Permission.bluetoothConnect.request();
+    await Permission.bluetoothScan.request();
+    await Permission.location.request();
+
     await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo).doc("TirePairStatus")
         .get().then((value) async {
       dynamic data=value.data();
@@ -89,30 +111,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       String frs=data['frontRight'];
       String rls=data['rearLeft'];
       String rrs=data['rearRight'];
+
       if(fls!="Not Paired"){
         setState(() {
           frontLeftStatus=fls;
         });
-
-        // ScanResult frontleft=deviceList[deviceList.indexWhere((element) =>
-        //       element.device.id.toString()==frontLeftStatus
-        // )];
-
-        // try{
-        //   if(frontleft!=null){
-        //     await frontleft!.device.connect(autoConnect: false).then((value){
-        //       setState(() {
-        //         frontLeftConnection="Connected";
-        //       });
-        //     });
-        //   }
-        // }catch(e){
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //       SnackBar(
-        //         content: Text(e.toString()),
-        //       ));
-        // }
-
 
       }
       if(frs!="Not Paired"){
@@ -127,28 +130,6 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           rearLeftStatus=rls;
         });
 
-        ScanResult rearleft=deviceList[deviceList.indexWhere((element) =>
-        element.device.id.toString()==rearLeftStatus
-        )];
-
-        try{
-
-          await rearleft.device.connect(autoConnect: false).then((value) async{
-            setState(() {
-              rearLeftConnection="Connected";
-            });
-          });
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(rearleft.device.state.first.toString()),
-              ));
-
-        }catch(e){
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-              ));
-        }
 
       }
       if(rrs!="Not Paired"){
@@ -156,121 +137,283 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           rearRightStatus=rrs;
         });
 
-
-        ScanResult rearright=deviceList[deviceList.indexWhere((element) =>
-        element.device.id.toString()==rearRightStatus
-        )];
+      }
 
 
-        try{
+    });
 
-          await rearright.device.connect(autoConnect: false).then((value) async{
+  }
+
+  void startFrontLeftService(BluetoothDevice device){
+    Timer.periodic(Duration(seconds: 60), (timer) async {
+      List<BluetoothService> services = await device.discoverServices();
+      services.forEach((service) async {
+        // do something with service
+        var characteristics = service.characteristics;
+        print('List of Characteristcs of ${device.id} => '+characteristics.toString());
+
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="20d3327e-ddb0-4e1e-ab13-7569a685b4bf")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
             setState(() {
-              rearRightConnection="Connected";
+              frontLeftTemp=value[0].toString();
             });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
           });
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(rearright.device.state.first.toString()),
-              ));
-
-        }catch(e){
-          ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(e.toString()),
-              ));
         }
 
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="1a8ce623-1cbc-4641-9f47-b75767a7275a")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              frontLeftPressure=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
 
-      }
+        await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+            .doc(DateTime.now().millisecondsSinceEpoch.toString())
+            .set({
+          "frontLeftPressure":frontLeftPressure,
+          "frontLeftTemperature":frontLeftTemp,
+          "frontRightPressure":frontRightPressure,
+          "frontRightTemperature":frontRightTemp,
+          "rearLeftPressure":rearLeftPressure,
+          "rearLeftTemperature":rearLeftTemp,
+          "rearRightPressure":rearRightPressure,
+          "rearRightTemperature":rearRightTemp,
+          "Time":DateTime.now().toString()
+        });
+
+      });
     });
-    //Speaker - BC:A9:61:4F:47:BB
+  }
 
-    // FlutterBlue flutterBlue = FlutterBlue.instance;
-    // flutterBlue.startScan(timeout: Duration(seconds: 30));
-    // flutterBlue.scanResults.listen((results) async {
-    //   // do something with scan results
-    //   for (ScanResult r in results) {
-    //     print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //           content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
-    //     );
-    //     if(r.device.id=="BC:A9:61:4F:47:BB"){
-    //       await r.device.connect();
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //           SnackBar(
-    //             content: Text('front left connection successful'),
-    //           ));
-    //     }else{
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //           SnackBar(
-    //             content: Text(frontLeftStatus+' not found'),
-    //           ));
-    //     }
-    //   }
-    //
-    //   //flutterBlue.stopScan();
-    //
-    // });
+  void startFrontRightService(BluetoothDevice device){
+    Timer.periodic(Duration(seconds: 60), (timer) async {
+      List<BluetoothService> services = await device.discoverServices();
+      services.forEach((service) async {
+        // do something with service
+        var characteristics = service.characteristics;
+        print('List of Characteristcs of ${device.id} => '+characteristics.toString());
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="20d3327e-ddb0-4e1e-ab13-7569a685b4bf")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              frontRightTemp=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
 
-    // FlutterBlueElves.instance.startScan(30000).listen((scanItem) async {
-    //   // ///Use the information in the scanned object to filter the devices you want
-    //   // ///if want to connect someone,call scanItem.connect,it will return Device object
-    //   // Device device = scanItem.connect(connectTimeout: 5000);
-    //   // ///you can use this device to listen bluetooth device's state
-    //   // device.stateStream.listen((newState){
-    //   //   ///newState is DeviceState type,include disconnected,disConnecting, connecting,connected, connectTimeout,initiativeDisConnected,destroyed
-    //   // }).onDone(() {
-    //   //   ///if scan timeout or you stop scan,will into this
-    //   // });
-    //
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //         SnackBar(
-    //             content: Text('Name =>${scanItem.name} MAC ADD=> ${scanItem.id}')),
-    //       );
-    //
-    //       if(scanItem.id==frontLeftStatus){
-    //         await scanItem.connect(connectTimeout: 5000);
-    //       }else{
-    //         ScaffoldMessenger.of(context).showSnackBar(
-    //           SnackBar(
-    //               content: Text('${frontLeftStatus} not found')),
-    //         );
-    //       }
-    //
-    // });
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="1a8ce623-1cbc-4641-9f47-b75767a7275a")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              frontRightPressure=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
 
+        await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+            .doc(DateTime.now().millisecondsSinceEpoch.toString())
+            .set({
+          "frontLeftPressure":frontLeftPressure,
+          "frontLeftTemperature":frontLeftTemp,
+          "frontRightPressure":frontRightPressure,
+          "frontRightTemperature":frontRightTemp,
+          "rearLeftPressure":rearLeftPressure,
+          "rearLeftTemperature":rearLeftTemp,
+          "rearRightPressure":rearRightPressure,
+          "rearRightTemperature":rearRightTemp,
+          "Time":DateTime.now().toString()
+        });
 
-    // try {
-    //   BluetoothConnection connection = await BluetoothConnection.toAddress(frontLeftStatus);
-    //   print('Connected to the device');
-    //
-    //           ScaffoldMessenger.of(context).showSnackBar(
-    //             SnackBar(
-    //                 content: Text('Connected to the device')),
-    //           );
-    //
-    //   // connection.input?.listen((Uint8List data) {
-    //   //   print('Data incoming: ${ascii.decode(data)}');
-    //   //   connection.output.add(data); // Sending data
-    //   //
-    //   //   if (ascii.decode(data).contains('!')) {
-    //   //     connection.finish(); // Closing connection
-    //   //     print('Disconnecting by local host');
-    //   //   }
-    //   // }).onDone(() {
-    //   //   print('Disconnected by remote request');
-    //   // });
-    // }
-    // catch (exception) {
-    //   print('Cannot connect, exception occured');
-    //   ScaffoldMessenger.of(context).showSnackBar(
-    //     SnackBar(
-    //         content: Text('Cannot connect, exception occured')),
-    //   );
-    // }
+      });
+    });
+  }
 
+  void startRearLeftService(BluetoothDevice device){
+    Timer.periodic(Duration(seconds: 60), (timer) async {
+      List<BluetoothService> services = await device.discoverServices();
+      services.forEach((service) async {
+        // do something with service
+        var characteristics = service.characteristics;
+        print('List of Characteristcs of ${device.id} => '+characteristics.toString());
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="20d3327e-ddb0-4e1e-ab13-7569a685b4bf")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              rearLeftTemp=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
+
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="1a8ce623-1cbc-4641-9f47-b75767a7275a")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              rearLeftPressure=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
+
+        await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+            .doc(DateTime.now().millisecondsSinceEpoch.toString())
+            .set({
+          "frontLeftPressure":frontLeftPressure,
+          "frontLeftTemperature":frontLeftTemp,
+          "frontRightPressure":frontRightPressure,
+          "frontRightTemperature":frontRightTemp,
+          "rearLeftPressure":rearLeftPressure,
+          "rearLeftTemperature":rearLeftTemp,
+          "rearRightPressure":rearRightPressure,
+          "rearRightTemperature":rearRightTemp,
+          "Time":DateTime.now().toString()
+        });
+
+      });
+    });
+  }
+
+  void startRearRightService(BluetoothDevice device){
+    Timer.periodic(Duration(seconds: 60), (timer) async {
+      List<BluetoothService> services = await device.discoverServices();
+      services.forEach((service) async {
+        // do something with service
+        var characteristics = service.characteristics;
+        print('List of Characteristcs of ${device.id} => '+characteristics.toString());
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="20d3327e-ddb0-4e1e-ab13-7569a685b4bf")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              rearRightTemp=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
+
+        for(BluetoothCharacteristic c in characteristics.where((element) => element.uuid.toString()=="1a8ce623-1cbc-4641-9f47-b75767a7275a")) {
+          await c.setNotifyValue(true);
+          c.value.listen((value) {
+            // do something with new value
+            setState(() {
+              rearRightPressure=value[0].toString();
+            });
+            print('Notify Value =>=> '+value.toString());
+            SnackBar(
+              content: Text('Notify Value =>=> '+value.toString()),
+            );
+          });
+        }
+
+        await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+            .doc(DateTime.now().millisecondsSinceEpoch.toString())
+            .set({
+          "frontLeftPressure":frontLeftPressure,
+          "frontLeftTemperature":frontLeftTemp,
+          "frontRightPressure":frontRightPressure,
+          "frontRightTemperature":frontRightTemp,
+          "rearLeftPressure":rearLeftPressure,
+          "rearLeftTemperature":rearLeftTemp,
+          "rearRightPressure":rearRightPressure,
+          "rearRightTemperature":rearRightTemp,
+          "Time":DateTime.now().toString()
+        });
+
+      });
+    });
+  }
+
+  void ConnectDevices() async{
+    if(frontLeftStatus!='Front Left Status\nClick on wheel to pair'){
+      setState(() {
+        frontLeftConnection='Connecting..';
+      });
+      BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
+      element.id.toString()==frontLeftStatus
+      )];
+      await device.connect(autoConnect: false).then((value){
+        setState(() {
+          frontLeftConnection='Connected';
+          startFrontLeftService(device);
+        });
+      });
+    }
+    if(frontRightStatus!='Front Right Status\nClick on wheel to pair'){
+      setState(() {
+        frontRightConnection='Connecting..';
+      });
+      BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
+      element.id.toString()==frontRightStatus
+      )];
+      await device.connect(autoConnect: false).then((value){
+        setState(() {
+          frontRightConnection='Connected';
+          startFrontRightService(device);
+        });
+      });
+    }
+    if(rearLeftStatus!='Rear Left Status\nClick on wheel to pair'){
+      setState(() {
+        rearLeftConnection='Connecting..';
+      });
+      BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
+      element.id.toString()==rearLeftStatus
+      )];
+      await device.connect(autoConnect: false).then((value){
+        setState(() {
+          rearLeftConnection='Connected';
+          startRearLeftService(device);
+        });
+      });
+    }
+    if(rearRightStatus!='Rear Right Status\nClick on wheel to pair'){
+      setState(() {
+        rearRightConnection='Connecting..';
+      });
+      BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
+      element.id.toString()==rearRightStatus
+      )];
+      await device.connect(autoConnect: false).then((value){
+        setState(() {
+          rearRightConnection='Connected';
+          startRearRightService(device);
+        });
+      });
+    }
   }
 
   @override
@@ -283,49 +426,14 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           SnackBar(
               content: Text('Bluetooth has been enabled')),
         );
-        // FlutterBlue flutterBlue = FlutterBlue.instance;
-        // flutterBlue.startScan(timeout: Duration(seconds: 30));
-        // flutterBlue.scanResults.listen((results) async {
-        //   // do something with scan results
-        //   for (ScanResult r in results) {
-        //     print('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}');
-        //       ScaffoldMessenger.of(context).showSnackBar(
-        //         SnackBar(
-        //             content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
-        //       );
-        //       if(r.device.id==frontLeftStatus){
-        //         await r.device.connect();
-        //         ScaffoldMessenger.of(context).showSnackBar(
-        //           SnackBar(
-        //               content: Text('front left connection successful'),
-        //         ));
-        //       }else{
-        //         ScaffoldMessenger.of(context).showSnackBar(
-        //         SnackBar(
-        //         content: Text(frontLeftStatus+' not found'),
-        //         ));
-        //       }
-        //   }
-        //   flutterBlue.stopScan();
-        //
-        // });
 
-        // final flutterReactiveBle = FlutterReactiveBle();
-        // flutterReactiveBle.scanForDevices(withServices: [],).listen((device) {
-        //   //code for handling results
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //     SnackBar(
-        //         content: Text(device.name+" "+device.id)),
-        //   );
-        //
-        // }, onError: () {
-        //   //code for handling error
-        //   ScaffoldMessenger.of(context).showSnackBar(
-        //     SnackBar(
-        //         content: Text('Bluetooth Scan Error')),
-        //   );
-        //
-        // });
+        Future.delayed(Duration(seconds:1),(){
+          scanDevices();
+        });
+
+        Future.delayed(Duration(seconds:4),(){
+          ConnectDevices();
+        });
 
       }
       else if (result == "false") {
@@ -345,12 +453,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
     //       );
     // });
 
-    Timer(Duration(seconds: 2), () {
-      scanDevices();
-    });
+    //loadData();
 
-    Timer(Duration(seconds: 23), () {
-      getData();
+
+    Future.delayed(Duration(seconds:2),(){
+      loadData();
     });
 
     super.initState();
@@ -373,9 +480,9 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                     children: [
                       Column(
                         children: [
-                          Text('Front Left Pressure',style: TextStyle(fontSize: 8),),
+                          Text(frontLeftPressure,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
-                          Text('Front Left Temperature',style: TextStyle(fontSize: 8),),
+                          Text(frontLeftTemp,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
                           Text(frontLeftStatus,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
@@ -396,7 +503,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                           );
                         },
                         child: Image.asset(
-                            'assets/images/wheel.png',
+                          'assets/images/wheel.png',
                           fit: BoxFit.cover,
                           width: 60,height: 60,
                         ),
@@ -425,9 +532,9 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                       SizedBox(width: 10,),
                       Column(
                         children: [
-                          Text('Front Right Pressure',style: TextStyle(fontSize: 8),),
+                          Text(frontRightPressure,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
-                          Text('Front Right Temperature',style: TextStyle(fontSize: 8),),
+                          Text(frontRightTemp,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
                           Text(frontRightStatus,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
@@ -443,9 +550,9 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                     children: [
                       Column(
                         children: [
-                          Text('Rear Left Pressure',style: TextStyle(fontSize: 8),),
+                          Text(rearLeftPressure,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
-                          Text('Rear Left Temperature',style: TextStyle(fontSize: 8),),
+                          Text(rearLeftTemp,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
                           Text(rearLeftStatus,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
@@ -495,9 +602,9 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                       SizedBox(width: 10,),
                       Column(
                         children: [
-                          Text('Rear Right Pressure',style: TextStyle(fontSize: 8),),
+                          Text(rearRightPressure,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
-                          Text('Rear Right Temperature',style: TextStyle(fontSize: 8),),
+                          Text(rearRightTemp,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
                           Text(rearRightStatus,style: TextStyle(fontSize: 8),),
                           SizedBox(height: 10,),
