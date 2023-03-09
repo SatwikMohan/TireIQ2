@@ -53,7 +53,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
   FlutterBlue flutterBlue = FlutterBlue.instance;
 
   void scanDevices(){
-    deviceList.clear();
+    // deviceList.clear();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
           content: Text('Scanning devices please wait')),
@@ -69,22 +69,24 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
         //       content: Text('${r.device.name} Mac Address : ${r.device.id} found! rssi: ${r.rssi}')),
         // );
         deviceList.add(r.device);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Added ${r.device.id} to devices list now size is ${deviceList.length}'),
-            ));
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //       content: Text('Added ${r.device.id} to devices list now size is ${deviceList.length}'),
+        // ));
       }
 
     });
 
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Stop Scan'),
+          content: Text('Stop Scan Called'),
         ));
 
     print('Stop Scan Called');
 
     flutterBlue.stopScan();
+
+    //ConnectDevices();
 
   }
 
@@ -138,6 +140,33 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
         });
 
       }
+
+
+      BluetoothEnable.enableBluetooth.then((result) {
+        if (result == "true") {
+          // Bluetooth has been enabled
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Bluetooth has been enabled')),
+          );
+
+          Future.delayed(Duration(seconds:1),(){
+            scanDevices();
+          });
+
+          Future.delayed(Duration(seconds:8),(){
+            ConnectDevices();
+          });
+
+        }
+        else if (result == "false") {
+          // Bluetooth has not been enabled
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+                content: Text('Bluetooth cannot be enabled')),
+          );
+        }
+      });
 
 
     });
@@ -365,12 +394,19 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
       element.id.toString()==frontLeftStatus
       )];
-      await device.connect(autoConnect: false).then((value){
-        setState(() {
-          frontLeftConnection='Connected';
-          startFrontLeftService(device);
-        });
-      });
+      try {
+        await device.connect().then((value){
+          setState(() {
+            frontLeftConnection='Connected';
+            startFrontLeftService(device);
+          });
+        }).timeout(Duration(seconds: 10));
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+            ));
+      }
     }
     if(frontRightStatus!='Front Right Status\nClick on wheel to pair'){
       setState(() {
@@ -379,12 +415,19 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
       element.id.toString()==frontRightStatus
       )];
-      await device.connect(autoConnect: false).then((value){
-        setState(() {
-          frontRightConnection='Connected';
-          startFrontRightService(device);
-        });
-      });
+      try {
+        await device.connect().then((value){
+          setState(() {
+            frontRightConnection='Connected';
+            startFrontRightService(device);
+          });
+        }).timeout(Duration(seconds: 10));
+      }  catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+            ));
+      }
     }
     if(rearLeftStatus!='Rear Left Status\nClick on wheel to pair'){
       setState(() {
@@ -393,12 +436,19 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
       element.id.toString()==rearLeftStatus
       )];
-      await device.connect(autoConnect: false).then((value){
-        setState(() {
-          rearLeftConnection='Connected';
-          startRearLeftService(device);
-        });
-      });
+      try {
+        await device.connect().then((value){
+          setState(() {
+            rearLeftConnection='Connected';
+            startRearLeftService(device);
+          });
+        }).timeout(Duration(seconds: 10));
+      }  catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+            ));
+      }
     }
     if(rearRightStatus!='Rear Right Status\nClick on wheel to pair'){
       setState(() {
@@ -407,60 +457,61 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       BluetoothDevice device=deviceList[deviceList.indexWhere((element)=>
       element.id.toString()==rearRightStatus
       )];
-      await device.connect(autoConnect: false).then((value){
-        setState(() {
-          rearRightConnection='Connected';
-          startRearRightService(device);
-        });
-      });
+      try {
+        await device.connect().then((value){
+          setState(() {
+            rearRightConnection='Connected';
+            startRearRightService(device);
+          });
+        }).timeout(Duration(seconds: 10));
+      }  catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(e.toString()),
+            ));
+      }
     }
   }
 
   @override
   void initState() {
 
-    BluetoothEnable.enableBluetooth.then((result) {
-      if (result == "true") {
-        // Bluetooth has been enabled
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Bluetooth has been enabled')),
-        );
+    //loadData();
 
-        Future.delayed(Duration(seconds:1),(){
-          scanDevices();
-        });
-
-        Future.delayed(Duration(seconds:4),(){
-          ConnectDevices();
-        });
-
-      }
-      else if (result == "false") {
-        // Bluetooth has not been enabled
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text('Bluetooth cannot be enabled')),
-        );
-      }
-    });
-
-    // FlutterBlueElves.instance.androidOpenBluetoothService((isOk) {
-    //   print(isOk ? "The user agrees to turn on the Bluetooth function" : "The user does not agrees to turn on the Bluetooth function");
-    //       ScaffoldMessenger.of(context).showSnackBar(
-    //         SnackBar(
-    //             content: Text('Bluetooth has been enabled')),
-    //       );
+    // BluetoothEnable.enableBluetooth.then((result) {
+    //   if (result == "true") {
+    //     // Bluetooth has been enabled
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(
+    //           content: Text('Bluetooth has been enabled')),
+    //     );
+    //
+    //     Future.delayed(Duration(seconds:1),(){
+    //       scanDevices();
+    //     });
+    //
+    //     Future.delayed(Duration(seconds:2),(){
+    //       ConnectDevices();
+    //     });
+    //
+    //   }
+    //   else if (result == "false") {
+    //     // Bluetooth has not been enabled
+    //     ScaffoldMessenger.of(context).showSnackBar(
+    //       SnackBar(
+    //           content: Text('Bluetooth cannot be enabled')),
+    //     );
+    //   }
     // });
 
     //loadData();
 
-
-    Future.delayed(Duration(seconds:2),(){
+    super.initState();
+    print('INIT STATE CALLED BEFORE LOAD DATA');
+    Future.delayed(Duration(seconds:1),(){
       loadData();
     });
 
-    super.initState();
   }
 
   @override
