@@ -1,6 +1,8 @@
 
 import 'dart:async';
 import 'dart:convert';
+import 'dart:ffi';
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:bluetooth_enable_fork/bluetooth_enable_fork.dart';
@@ -35,15 +37,33 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
   String rearLeftConnection="Not Connected";
   String rearRightConnection="Not Connected";
 
-  String frontLeftTemp="25";
-  String frontRightTemp="25";
-  String rearRightTemp="25";
-  String rearLeftTemp="25";
+  String frontLeftTemp="";
+  String frontRightTemp="";
+  String rearRightTemp="";
+  String rearLeftTemp="";
 
-  String frontLeftPressure="0";
-  String frontRightPressure="0";
-  String rearLeftPressure="0";
-  String rearRightPressure="0";
+  String frontLeftPressure="";
+  String frontRightPressure="";
+  String rearLeftPressure="";
+  String rearRightPressure="";
+
+  String ValueUpdateTime="-:-:-";
+  String ConnectionUpdateTime="-:-:-";
+
+  String frontLeftUpdateTime="-";
+  String frontRightUpdateTime="-";
+  String rearLeftUpdateTime="-";
+  String rearRightUpdateTime="-";
+
+  int flt=1;//flag
+  int frt=1;//flag
+  int rlt=1;//flag
+  int rrt=1;//flag
+
+  int frontLeftLastTime=0;
+  int frontRightLastTime=0;
+  int rearLeftLastTime=0;
+  int rearRightLastTime=0;
 
   List<BluetoothDevice> deviceList=<BluetoothDevice>[];
 
@@ -209,6 +229,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           });
         }
 
+        DateTime dateTime=DateTime.now();
         await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
             .doc(DateTime.now().millisecondsSinceEpoch.toString())
             .set({
@@ -220,7 +241,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           "rearLeftTemperature":rearLeftTemp,
           "rearRightPressure":rearRightPressure,
           "rearRightTemperature":rearRightTemp,
-          "Time":DateTime.now().toString()
+          "Time":dateTime.toString()
+        });
+        setState(() {
+          ValueUpdateTime=dateTime.toString();
+          frontLeftUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
         });
 
       });
@@ -262,6 +287,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           });
         }
 
+        DateTime dateTime=DateTime.now();
         await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
             .doc(DateTime.now().millisecondsSinceEpoch.toString())
             .set({
@@ -273,7 +299,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           "rearLeftTemperature":rearLeftTemp,
           "rearRightPressure":rearRightPressure,
           "rearRightTemperature":rearRightTemp,
-          "Time":DateTime.now().toString()
+          "Time":dateTime.toString()
+        });
+        setState(() {
+          ValueUpdateTime=dateTime.toString();
+          frontRightUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
         });
 
       });
@@ -315,6 +345,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           });
         }
 
+        DateTime dateTime=DateTime.now();
         await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
             .doc(DateTime.now().millisecondsSinceEpoch.toString())
             .set({
@@ -326,7 +357,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           "rearLeftTemperature":rearLeftTemp,
           "rearRightPressure":rearRightPressure,
           "rearRightTemperature":rearRightTemp,
-          "Time":DateTime.now().toString()
+          "Time":dateTime.toString()
+        });
+        setState(() {
+          ValueUpdateTime=dateTime.toString();
+          rearLeftUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
         });
 
       });
@@ -368,6 +403,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           });
         }
 
+        DateTime dateTime=DateTime.now();
         await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
             .doc(DateTime.now().millisecondsSinceEpoch.toString())
             .set({
@@ -379,7 +415,11 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
           "rearLeftTemperature":rearLeftTemp,
           "rearRightPressure":rearRightPressure,
           "rearRightTemperature":rearRightTemp,
-          "Time":DateTime.now().toString()
+          "Time":dateTime.toString()
+        });
+        setState(() {
+          ValueUpdateTime=dateTime.toString();
+          rearRightUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
         });
 
       });
@@ -471,40 +511,161 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
             ));
       }
     }
+
+    Timer.periodic(Duration(seconds: 120), (timer) async{
+
+      print('CONNECTION PERIODIC CHECK RAN AFTER 2 minutes');
+      var connectedDeviceList=await flutterBlue.connectedDevices;
+      for(BluetoothDevice device in connectedDeviceList){
+        if(device.id.toString()==frontLeftStatus){
+          setState(() {
+            frontLeftConnection="Connected";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "frontLeft":"Connected",
+            "Time":DateTime.now().toString()
+          });
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+          });
+          break;
+        }else{
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+            frontLeftPressure="";
+            frontLeftTemp="";
+            frontLeftConnection="Re-Connecting..";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "frontLeft":"Not Connected",
+            "Time":DateTime.now().toString()
+          });
+        }
+      }
+      for(BluetoothDevice device in connectedDeviceList){
+        if(device.id.toString()==frontRightStatus){
+          setState(() {
+            frontRightConnection="Connected";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "frontRight":"Connected",
+            "Time":DateTime.now().toString()
+          });
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+          });
+          break;
+        }else{
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+            frontRightPressure="";
+            frontRightTemp="";
+            frontRightConnection="Re-Connecting..";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "frontRight":"Not Connected",
+            "Time":DateTime.now().toString()
+          });
+        }
+      }
+      for(BluetoothDevice device in connectedDeviceList){
+        if(device.id.toString()==rearLeftStatus){
+          setState(() {
+            rearLeftConnection="Connected";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "rearLeft":"Connected",
+            "Time":DateTime.now().toString()
+          });
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+          });
+          break;
+        }else{
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+            rearLeftPressure="";
+            rearLeftTemp="";
+            rearLeftConnection="Re-Connecting..";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "rearLeft":"Not Connected",
+            "Time":DateTime.now().toString()
+          });
+        }
+      }
+      for(BluetoothDevice device in connectedDeviceList){
+        if(device.id.toString()==frontLeftStatus){
+          setState(() {
+            rearRightConnection="Connected";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "rearRight":"Connected",
+            "Time":DateTime.now().toString()
+          });
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+          });
+          break;
+        }else{
+          setState(() {
+            ConnectionUpdateTime=DateTime.now().toString();
+            rearRightPressure="";
+            rearRightTemp="";
+            rearRightConnection="Re-Connecting..";
+          });
+          await FirebaseFirestore.instance.collection("users").doc(email).collection(vehicleRegNo)
+              .doc("TireConnectionStatus")
+              .update({
+            "rearRight":"Not Connected",
+            "Time":DateTime.now().toString()
+          });
+        }
+      }
+
+    });
+
+    Timer.periodic(Duration(seconds: 1), (timer) {
+      if(frontLeftUpdateTime!="-"){
+        setState(() {
+          frontLeftUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
+        });
+      }
+      if(frontRightUpdateTime!="-"){
+        setState(() {
+          frontRightUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
+        });
+      }
+      if(rearLeftUpdateTime!="-"){
+        setState(() {
+          rearLeftUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
+        });
+      }
+      if(rearRightUpdateTime!="-"){
+        setState(() {
+          rearRightUpdateTime=((DateTime.now().millisecondsSinceEpoch-DateTime.parse(ValueUpdateTime).millisecondsSinceEpoch)/1000).toString()+"s Ago";
+        });
+      }
+    });
+
   }
 
   @override
   void initState() {
-
-    //loadData();
-
-    // BluetoothEnable.enableBluetooth.then((result) {
-    //   if (result == "true") {
-    //     // Bluetooth has been enabled
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //           content: Text('Bluetooth has been enabled')),
-    //     );
-    //
-    //     Future.delayed(Duration(seconds:1),(){
-    //       scanDevices();
-    //     });
-    //
-    //     Future.delayed(Duration(seconds:2),(){
-    //       ConnectDevices();
-    //     });
-    //
-    //   }
-    //   else if (result == "false") {
-    //     // Bluetooth has not been enabled
-    //     ScaffoldMessenger.of(context).showSnackBar(
-    //       SnackBar(
-    //           content: Text('Bluetooth cannot be enabled')),
-    //     );
-    //   }
-    // });
-
-    //loadData();
 
     super.initState();
     print('INIT STATE CALLED BEFORE LOAD DATA');
@@ -521,7 +682,7 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
       body: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Padding(
-          padding: EdgeInsets.only(top: 100,left: 20,right: 20,bottom: 20),
+          padding: EdgeInsets.only(top: 50,left: 20,right: 20,bottom: 20),
           child: Container(
             color: Colors.white.withOpacity(0.3),
             child: Expanded(
@@ -531,13 +692,15 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                     children: [
                       Column(
                         children: [
-                          Text(frontLeftPressure,style: TextStyle(fontSize: 8),),
+                          Text(frontLeftPressure,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontLeftTemp,style: TextStyle(fontSize: 8),),
+                          Text(frontLeftTemp,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontLeftStatus,style: TextStyle(fontSize: 8),),
+                          Text(frontLeftStatus,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontLeftConnection,style: TextStyle(fontSize: 8),),
+                          Text(frontLeftConnection,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
+                          SizedBox(height: 10,),
+                          Text(frontLeftUpdateTime,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                         ],
                       ),
                       SizedBox(width: 10,),
@@ -583,13 +746,15 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                       SizedBox(width: 10,),
                       Column(
                         children: [
-                          Text(frontRightPressure,style: TextStyle(fontSize: 8),),
+                          Text(frontRightPressure,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontRightTemp,style: TextStyle(fontSize: 8),),
+                          Text(frontRightTemp,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontRightStatus,style: TextStyle(fontSize: 8),),
+                          Text(frontRightStatus,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(frontRightConnection,style: TextStyle(fontSize: 8),),
+                          Text(frontRightConnection,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
+                          SizedBox(height: 10,),
+                          Text(frontRightUpdateTime,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                         ],
                       ),
                     ],
@@ -601,13 +766,15 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                     children: [
                       Column(
                         children: [
-                          Text(rearLeftPressure,style: TextStyle(fontSize: 8),),
+                          Text(rearLeftPressure,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearLeftTemp,style: TextStyle(fontSize: 8),),
+                          Text(rearLeftTemp,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearLeftStatus,style: TextStyle(fontSize: 8),),
+                          Text(rearLeftStatus,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearLeftConnection,style: TextStyle(fontSize: 8),),
+                          Text(rearLeftConnection,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
+                          SizedBox(height: 10,),
+                          Text(rearLeftUpdateTime,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                         ],
                       ),
                       SizedBox(width: 10,),
@@ -653,17 +820,23 @@ class _VehicleTireRoomState extends State<VehicleTireRoom> {
                       SizedBox(width: 10,),
                       Column(
                         children: [
-                          Text(rearRightPressure,style: TextStyle(fontSize: 8),),
+                          Text(rearRightPressure,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearRightTemp,style: TextStyle(fontSize: 8),),
+                          Text(rearRightTemp,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearRightStatus,style: TextStyle(fontSize: 8),),
+                          Text(rearRightStatus,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                           SizedBox(height: 10,),
-                          Text(rearRightConnection,style: TextStyle(fontSize: 8),),
+                          Text(rearRightConnection,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
+                          SizedBox(height: 10,),
+                          Text(rearRightUpdateTime,style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                         ],
                       ),
                     ],
                   ),
+                  SizedBox(height: 40,),
+                  Text('Database Value Update Time : ${ValueUpdateTime}',style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
+                  SizedBox(height: 15,),
+                  Text('Database Connection Update Time : ${ConnectionUpdateTime}',style: TextStyle(fontSize: 10,fontWeight: FontWeight.bold),),
                 ],
               ),
             ),
